@@ -1,0 +1,46 @@
+#!/bin/bash
+#set -xv
+
+# 2016/10/17   RDG
+# Quick little script to parse through the receive__[hp]b835*.log's looking for 835 claims 
+# that were acknowledged from Experian
+# data includes date/time and filename - which is the claim name
+
+# 2016/10/18   RDG
+# added enhancements for mailing the report
+
+# 2016/11/22   RDG
+# the date format is different for days < 10
+# added the test for the $DAY
+
+# This script will be scheduled for 1530 hrs daily and emailed 
+
+# 2017/01/10   RDG
+# added a perl test to ensure the rsync info is not printed
+
+set `date +'%b %d'`
+MONTH=$1
+DAY=$2
+
+if [ "$DAY" -ge "10" ]
+then
+   cd /epic/prdfiles/Extracts/logs/clm_logs
+   ls -lart receive__[hp]b835* | grep "`date | awk '{print $2" "$3}'`" | awk '{print $NF}' | while read line
+   do
+      grep 835 $line | awk '{print $1"  "$2"  "$NF}' 
+   done > 835-report.pre
+else
+   cd /epic/prdfiles/Extracts/logs/clm_logs
+   ls -lart receive__[hp]b835* | grep "`date | awk '{print $2"  "$3}'`" | awk '{print $NF}' | while read line
+   do
+      grep 835 $line | awk '{print $1"  "$2"  "$NF}'
+   done > 835-report.pre
+fi
+
+/bin/cat /epic/prdfiles/Extracts/logs/clm_logs/835-report.pre | perl -lane 'print if $F[2] =~ m/^835_/' > /epic/prdfiles/Extracts/logs/clm_logs/835-report
+
+SUBJ="835 files for `date '+%A %F'`"
+FROM="835Report"
+TO="richard.garland@dhha.org,c.meka.mbagwuh@dhha.org,terry.lindesmith@dhha.org,adrian.burgess@dhha.org,kelley.marcella@dhha.org,hannah.yim@dhha.org,marcella.kelley@dhha.org,anita.shabazz@dhha.org,DL_PFSCashApp@dhha.org"
+mailx -s "$SUBJ" -r "$FROM" $TO < /epic/prdfiles/Extracts/logs/clm_logs/835-report
+
